@@ -2,29 +2,40 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
 use App\Repository\DiscountRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: DiscountRepository::class)]
+#[ApiResource(
+    normalizationContext: ['groups' => ['discount:read']],
+    denormalizationContext: ['groups' => ['discount:write']]
+)]
 class Discount
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['discount:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'discounts')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['discount:read', 'discount:write'])]
     private ?Product $product = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE)]
+    #[Groups(['discount:read', 'discount:write'])]
     private ?\DateTime $startDate = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE)]
+    #[Groups(['discount:read', 'discount:write'])]
     private ?\DateTime $endDate = null;
 
     #[ORM\Column]
+    #[Groups(['discount:read', 'discount:write'])]
     private ?int $percentage = null;
 
     public function getId(): ?int
