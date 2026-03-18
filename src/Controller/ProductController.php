@@ -87,6 +87,22 @@ class ProductController extends AbstractController
         return $this->json($data);
     }
 
+    #[Route('/search', name: 'api_product_search', methods: ['GET'])]
+    public function search(Request $request, ProductRepository $repository): JsonResponse
+    {
+        $searchTerm = $request->query->get('q', '');
+
+        if (strlen($searchTerm) < 2) {
+            return $this->json([]);
+        }
+
+        $products = $repository->searchByTitle($searchTerm);
+
+        $data = array_map(fn(Product $p) => $this->transformToDto($p), $products);
+
+        return $this->json($data);
+    }
+
     /**
      * TRANSFORMATION : Entité -> DTO
      */
