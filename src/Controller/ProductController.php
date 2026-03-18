@@ -58,6 +58,35 @@ class ProductController extends AbstractController
         return $this->json($this->transformToDto($product));
     }
 
+    #[Route('/{id}/similar', name: 'api_product_similar', methods: ['GET'])]
+    public function getSimilarProducts(Product $product, ProductRepository $repository): JsonResponse
+    {
+        $domain = $product->getMedicalDomain();
+        $category = $product->getCategory();
+
+        if ($domain && $domain !== 'N/A' && $domain !== '') {
+            $criteria = ['medicalDomain' => $domain];
+        } else {
+            $criteria = ['category' => $category];
+        }
+
+        $similarProducts = $repository->findBy(
+            $criteria,
+            ['id' => 'DESC'],
+            10
+        );
+
+        $filtered = array_filter($similarProducts, function(Product $p) use ($product) {
+            return $p->getId() !== $product->getId();
+        });
+
+        $finalList = array_slice($filtered, 0, 6);
+
+        $data = array_map(fn(Product $p) => $this->transformToDto($p), $finalList);
+
+        return $this->json($data);
+    }
+
     /**
      * TRANSFORMATION : Entité -> DTO
      */
