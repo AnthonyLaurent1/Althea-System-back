@@ -2,40 +2,29 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
 use App\Repository\DiscountRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: DiscountRepository::class)]
-#[ApiResource(
-    normalizationContext: ['groups' => ['discount:read']],
-    denormalizationContext: ['groups' => ['discount:write']]
-)]
 class Discount
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column]
-    #[Groups(['discount:read'])]
+    #[ORM\GeneratedValue(strategy: 'IDENTITY')]
+    #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'discounts')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['discount:read', 'discount:write'])]
     private ?Product $product = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE)]
-    #[Groups(['discount:read', 'discount:write'])]
-    private ?\DateTime $startDate = null;
+    private ?\DateTimeInterface $startDate = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE)]
-    #[Groups(['discount:read', 'discount:write'])]
-    private ?\DateTime $endDate = null;
+    private ?\DateTimeInterface $endDate = null;
 
     #[ORM\Column]
-    #[Groups(['discount:read', 'discount:write'])]
     private ?int $percentage = null;
 
     public function getId(): ?int
@@ -51,31 +40,28 @@ class Discount
     public function setProduct(?Product $product): static
     {
         $this->product = $product;
-
         return $this;
     }
 
-    public function getStartDate(): ?\DateTime
+    public function getStartDate(): ?\DateTimeInterface
     {
         return $this->startDate;
     }
 
-    public function setStartDate(\DateTime $startDate): static
+    public function setStartDate(\DateTimeInterface $startDate): static
     {
         $this->startDate = $startDate;
-
         return $this;
     }
 
-    public function getEndDate(): ?\DateTime
+    public function getEndDate(): ?\DateTimeInterface
     {
         return $this->endDate;
     }
 
-    public function setEndDate(\DateTime $endDate): static
+    public function setEndDate(\DateTimeInterface $endDate): static
     {
         $this->endDate = $endDate;
-
         return $this;
     }
 
@@ -87,7 +73,6 @@ class Discount
     public function setPercentage(int $percentage): static
     {
         $this->percentage = $percentage;
-
         return $this;
     }
 }

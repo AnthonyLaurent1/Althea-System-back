@@ -9,12 +9,11 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: OrderRepository::class)]
-#[ORM\Table(name: '`order`')]
 class Order
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column]
+    #[ORM\GeneratedValue(strategy: 'IDENTITY')]
+    #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'orders')]
@@ -22,7 +21,7 @@ class Order
     private ?User $user = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE)]
-    private ?\DateTime $paymentDate = null;
+    private ?\DateTimeInterface $paymentDate = null;
 
     #[ORM\Column]
     private ?float $totalPrice = null;
@@ -30,8 +29,11 @@ class Order
     /**
      * @var Collection<int, Item>
      */
-    #[ORM\OneToMany(targetEntity: Item::class, mappedBy: 'orderId')]
+    #[ORM\OneToMany(targetEntity: Item::class, mappedBy: 'order')]
     private Collection $items;
+
+    #[ORM\Column(length: 255)]
+    private ?string $status = null;
 
     public function __construct()
     {
@@ -51,19 +53,17 @@ class Order
     public function setUser(?User $user): static
     {
         $this->user = $user;
-
         return $this;
     }
 
-    public function getPaymentDate(): ?\DateTime
+    public function getPaymentDate(): ?\DateTimeInterface
     {
         return $this->paymentDate;
     }
 
-    public function setPaymentDate(\DateTime $paymentDate): static
+    public function setPaymentDate(\DateTimeInterface $paymentDate): static
     {
         $this->paymentDate = $paymentDate;
-
         return $this;
     }
 
@@ -75,7 +75,6 @@ class Order
     public function setTotalPrice(float $totalPrice): static
     {
         $this->totalPrice = $totalPrice;
-
         return $this;
     }
 
@@ -91,21 +90,29 @@ class Order
     {
         if (!$this->items->contains($item)) {
             $this->items->add($item);
-            $item->setOrderId($this);
+            $item->setOrder($this);
         }
-
         return $this;
     }
 
     public function removeItem(Item $item): static
     {
         if ($this->items->removeElement($item)) {
-            // set the owning side to null (unless already changed)
-            if ($item->getOrderId() === $this) {
-                $item->setOrderId(null);
+            if ($item->getOrder() === $this) {
+                $item->setOrder(null);
             }
         }
+        return $this;
+    }
 
+    public function getStatus(): ?string
+    {
+        return $this->status;
+    }
+
+    public function setStatus(string $status): static
+    {
+        $this->status = $status;
         return $this;
     }
 }

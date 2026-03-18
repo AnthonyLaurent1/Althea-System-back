@@ -9,8 +9,8 @@ use Doctrine\ORM\Mapping as ORM;
 class Item
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue]
-    #[ORM\Column]
+    #[ORM\GeneratedValue(strategy: 'IDENTITY')]
+    #[ORM\Column(type: 'integer')]
     private ?int $id = null;
 
     #[ORM\ManyToOne]
@@ -23,9 +23,9 @@ class Item
     #[ORM\Column]
     private ?float $price = null;
 
-    #[ORM\ManyToOne(inversedBy: 'items')]
+    #[ORM\ManyToOne(targetEntity: Order::class, inversedBy: 'items')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?order $orderId = null;
+    private ?Order $order = null;
 
     public function getId(): ?int
     {
@@ -40,7 +40,6 @@ class Item
     public function setProduct(?Product $product): static
     {
         $this->product = $product;
-
         return $this;
     }
 
@@ -52,7 +51,6 @@ class Item
     public function setQuantity(int $quantity): static
     {
         $this->quantity = $quantity;
-
         return $this;
     }
 
@@ -64,19 +62,17 @@ class Item
     public function setPrice(float $price): static
     {
         $this->price = $price;
-
         return $this;
     }
 
-    public function getOrderId(): ?order
+    public function getOrder(): ?Order
     {
-        return $this->orderId;
+        return $this->order;
     }
 
-    public function setOrderId(?order $orderId): static
+    public function setOrder(?Order $order): static
     {
-        $this->orderId = $orderId;
-
+        $this->order = $order;
         return $this;
     }
 }
