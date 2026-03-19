@@ -134,4 +134,12 @@ class AuthController extends AbstractController
 
         return new JsonResponse(['message' => 'Mot de passe réinitialisé avec succès'], 200);
     }
+
+    #[Route('/logout', name: 'api_logout', methods: ['POST'])]
+    public function logout(): JsonResponse
+    {
+        return new JsonResponse([
+            'message' => 'Déconnexion réussie'
+        ]);
+    }
 }

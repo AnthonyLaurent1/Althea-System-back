@@ -2,11 +2,11 @@
 
 namespace App\Entity;
 
-use App\Repository\ItemRepository;
+use App\Repository\ItemsRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: ItemRepository::class)]
-class Item
+#[ORM\Entity(repositoryClass: ItemsRepository::class)]
+class Items
 {
     #[ORM\Id]
     #[ORM\GeneratedValue(strategy: 'IDENTITY')]
@@ -23,9 +23,9 @@ class Item
     #[ORM\Column]
     private ?float $price = null;
 
-    #[ORM\ManyToOne(targetEntity: Order::class, inversedBy: 'items')]
+    #[ORM\ManyToOne(targetEntity: Orders::class, inversedBy: 'items')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?Order $order = null;
+    private ?Orders $orders = null;
 
     public function getId(): ?int
     {
@@ -65,14 +65,14 @@ class Item
         return $this;
     }
 
-    public function getOrder(): ?Order
+    public function getOrders(): ?Orders
     {
-        return $this->order;
+        return $this->orders;
     }
 
-    public function setOrder(?Order $order): static
+    public function setOrders(?Orders $orders): static
     {
-        $this->order = $order;
+        $this->orders = $orders;
         return $this;
     }
 }

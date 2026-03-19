@@ -63,9 +63,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?bool $isVerified = null;
 
     /**
-     * @var Collection<int, Order>
+     * @var Collection<int, Orders>
      */
-    #[ORM\OneToMany(targetEntity: Order::class, mappedBy: 'user')]
+    #[ORM\OneToMany(targetEntity: Orders::class, mappedBy: 'user')]
     private Collection $orders;
 
     #[ORM\Column(length: 255, nullable: true)]
@@ -188,11 +188,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setIsVerified(bool $isVerified): static { $this->isVerified = $isVerified; return $this; }
 
     /**
-     * @return Collection<int, Order>
+     * @return Collection<int, Orders>
      */
     public function getOrders(): Collection { return $this->orders; }
 
-    public function addOrder(Order $order): static
+    public function addOrder(Orders $order): static
     {
         if (!$this->orders->contains($order)) {
             $this->orders->add($order);
@@ -201,7 +201,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function removeOrder(Order $order): static
+    public function removeOrder(Orders $order): static
     {
         if ($this->orders->removeElement($order)) {
             if ($order->getUser() === $this) {
