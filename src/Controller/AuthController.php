@@ -1,0 +1,92 @@
+<?php
+
+namespace App\Controller;
+
+use App\Entity\User;
+use App\Service\EmailVerifier;
+use Doctrine\ORM\EntityManagerInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Routing\Attribute\Route;
+
+#[Route('/api/auth')]
+class AuthController extends AbstractController
+{
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly UserPasswordHasherInterface $passwordHasher
+    ) {}
+
+    /**
+     * @throws TransportExceptionInterface
+     */
+    #[Route('/register', name: 'api_register', methods: ['POST'])]
+    public function register(Request $request, EmailVerifier $emailVerifier): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+
+        if (empty($data['email']) || empty($data['password']) || empty($data['firstName']) || empty($data['lastName'])) {
+            return new JsonResponse(['error' => 'Champs obligatoires manquants'], 400);
+        }
+
+        $user = new User();
+        $user->setEmail($data['email']);
+        $user->setFirstName($data['firstName']);
+        $user->setLastName($data['lastName']);
+        $user->setPhone($data['phone'] ?? '');
+        $user->setCity($data['city'] ?? '');
+        $user->setCountry($data['country'] ?? '');
+        $user->setAddress($data['address'] ?? '');
+        $user->setAdditionalAddress($data['additionalAddress'] ?? '');
+        $user->setPostalCode($data['postalCode'] ?? '');
+        $user->setCompany($data['company'] ?? '');
+        $user->setSiret($data['siret'] ?? '');
+        $user->setIsVerified(false);
+
+        $user->setPassword($this->passwordHasher->hashPassword($user, $data['password']));
+
+        $this->em->persist($user);
+        $this->em->flush();
+
+        $emailVerifier->sendEmailConfirmation($user);
+
+        return new JsonResponse([
+            'message' => 'Utilisateur créé avec succès. Vérifiez votre email pour activer le compte.',
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'firstName' => $user->getFirstName(),
+                'lastName' => $user->getLastName(),
+                'phone' => $user->getPhone(),
+                'city' => $user->getCity(),
+                'country' => $user->getCountry(),
+                'address' => $user->getAddress(),
+                'additionalAddress' => $user->getAdditionalAddress(),
+                'postalCode' => $user->getPostalCode(),
+                'company' => $user->getCompany(),
+                'siret' => $user->getSiret(),
+                'isVerified' => $user->isVerified()
+            ]
+        ], 201);
+    }
+
+    #[Route('/verify-email/{token}', name: 'api_verify_email', methods: ['GET'])]
+    public function verifyEmail(string $token, EntityManagerInterface $em, JWTTokenManagerInterface $jwtManager): JsonResponse
+    {
+        $user = $em->getRepository(User::class)->findOneBy(['confirmationToken' => $token]);
+        if (!$user) {
+            return new JsonResponse(['error' => 'Token invalide'], 400);
+        }
+
+        $user->setIsVerified(true);
+        $em->flush();
+
+        $jwt = $jwtManager->create($user);
+
+        return new JsonResponse(['message' => 'Email vérifié avec succès !', 'token' => $jwt]);
+    }
+}
