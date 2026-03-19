@@ -3,7 +3,9 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Service\EmailVerifier;
+use App\Service\PasswordReset;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -83,10 +85,53 @@ class AuthController extends AbstractController
         }
 
         $user->setIsVerified(true);
+        $user->setConfirmationToken(null);
         $em->flush();
 
         $jwt = $jwtManager->create($user);
 
         return new JsonResponse(['message' => 'Email vérifié avec succès !', 'token' => $jwt]);
+    }
+
+    /**
+     * @throws TransportExceptionInterface
+     */
+    #[Route('/forgot-password', name: 'api_forgot_password', methods: ['POST'])]
+    public function forgotPassword(Request $request, PasswordReset $passwordReset, UserRepository $userRepo): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+        if (empty($data['email'])) {
+            return new JsonResponse(['error' => 'Email requis'], 400);
+        }
+
+        $user = $userRepo->findOneBy(['email' => $data['email']]);
+        if (!$user) {
+            return new JsonResponse(['message' => 'Email envoyé si le compte existe'], 200); // éviter la fuite d'info
+        }
+
+        $passwordReset->sendResetPasswordEmail($user);
+        return new JsonResponse(['message' => 'Email de réinitialisation envoyé si le compte existe'], 200);
+    }
+
+    #[Route('/reset-password/{token}', name: 'api_reset_password', methods: ['POST'])]
+    public function resetPassword(string $token, Request $request, UserRepository $userRepo, UserPasswordHasherInterface $passwordHasher): JsonResponse
+    {
+        $user = $userRepo->findOneBy(['resetPasswordToken' => $token]);
+        if (!$user || !$user->getResetPasswordTokenExpiresAt() || $user->getResetPasswordTokenExpiresAt() < new \DateTime()) {
+            return new JsonResponse(['error' => 'Token invalide ou expiré'], 400);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (empty($data['password'])) {
+            return new JsonResponse(['error' => 'Mot de passe requis'], 400);
+        }
+
+        $user->setPassword($passwordHasher->hashPassword($user, $data['password']));
+        $user->setResetPasswordToken(null);
+        $user->setResetPasswordTokenExpiresAt(null);
+
+        $this->em->flush();
+
+        return new JsonResponse(['message' => 'Mot de passe réinitialisé avec succès'], 200);
     }
 }
