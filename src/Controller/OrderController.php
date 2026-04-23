@@ -11,6 +11,7 @@ use App\Repository\OrdersRepository;
 use App\Repository\ProductRepository;
 use App\Service\StripeService;
 use Doctrine\ORM\EntityManagerInterface;
+use Exception;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Webhook;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -383,11 +384,9 @@ class OrderController extends AbstractController
         ]);
     }
 
-    #[Route('/stripe/webhook', methods: ['POST'])]
+    #[Route('/stripe/webhook', name: 'stripe_webhook', methods: ['POST'])]
     public function stripeWebhook(Request $request, EntityManagerInterface $em): JsonResponse
     {
-        $endpointSecret = $_ENV['STRIPE_WEBHOOK_SECRET'];
-
         $payload = $request->getContent();
         $sigHeader = $request->headers->get('Stripe-Signature');
 
@@ -395,35 +394,53 @@ class OrderController extends AbstractController
             $event = Webhook::constructEvent(
                 $payload,
                 $sigHeader,
-                $endpointSecret
+                $_ENV['STRIPE_WEBHOOK_SECRET']
             );
         } catch (\Exception $e) {
-            return $this->json(['error' => 'Webhook invalide'], 400);
+            return new JsonResponse(['error' => 'invalid webhook'], 400);
         }
 
-        if ($event->type === 'checkout.session.completed') {
-
-            $session = $event->data->object;
-
-            $orderId = $session->metadata->orderId ?? null;
-
-            if (!$orderId) {
-                return $this->json(['error' => 'OrderId manquant'], 400);
-            }
-
-            $order = $em->getRepository(Orders::class)->find($orderId);
-
-            if (!$order) {
-                return $this->json(['error' => 'Commande introuvable'], 404);
-            }
-
-            $order->setStatus('paid');
-            $order->setPaymentDate(new \DateTime());
-
-            $em->flush();
+        if ($event->type !== 'checkout.session.completed') {
+            return new JsonResponse(['ignored' => true]);
         }
 
-        return $this->json(['received' => true]);
+        $session = $event->data->object;
+        $orderId = $session->metadata->orderId ?? null;
+
+        if (!$orderId) {
+            return new JsonResponse(['error' => 'missing orderId'], 400);
+        }
+
+        $order = $em->getRepository(Orders::class)->find($orderId);
+
+        if (!$order) {
+            return new JsonResponse(['error' => 'order not found'], 404);
+        }
+
+        if ($order->getStatus() === 'paid') {
+            return new JsonResponse(['message' => 'already processed']);
+        }
+
+        foreach ($order->getItems() as $item) {
+            $product = $item->getProduct();
+
+            $newStock = $product->getInStock() - $item->getQuantity();
+
+            if ($newStock < 0) {
+                return new JsonResponse([
+                    'error' => "Stock insuffisant pour {$product->getTitle()}"
+                ], 400);
+            }
+
+            $product->setInStock($newStock);
+        }
+
+        $order->setStatus('paid');
+        $order->setPaymentDate(new \DateTime());
+
+        $em->flush();
+
+        return new JsonResponse(['ok' => true]);
     }
 
     #[Route('/success', methods: ['GET'])]
