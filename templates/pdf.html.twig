@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 12px;
+            color: #222;
+            margin: 30px;
+        }
+
+        h1, h2, h3 {
+            margin: 0 0 10px 0;
+        }
+
+        .top {
+            margin-bottom: 30px;
+        }
+
+        .block {
+            margin-bottom: 20px;
+        }
+
+        .muted {
+            color: #666;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            border: 1px solid #dcdcdc;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background: #f3f3f3;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .totals {
+            margin-top: 20px;
+            width: 320px;
+            margin-left: auto;
+        }
+
+        .totals td {
+            border: none;
+            padding: 6px 0;
+        }
+
+        .total-final td {
+            font-weight: bold;
+            border-top: 1px solid #000;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="top">
+    <h1>Facture</h1>
+    <div class="muted">Numéro : {{ invoiceNumber }}</div>
+    <div class="muted">Date de paiement : {{ order.paymentDate ? order.paymentDate|date('d/m/Y') : '-' }}</div>
+    <div class="muted">Commande n° {{ order.id }}</div>
+</div>
+
+<div class="block">
+    <h3>Client</h3>
+    <div>{{ customer.firstName }} {{ customer.lastName }}</div>
+    <div>{{ customer.email }}</div>
+    <div>{{ customer.phone }}</div>
+    <div>{{ customer.address }}</div>
+    {% if customer.additionalAddress %}
+        <div>{{ customer.additionalAddress }}</div>
+    {% endif %}
+    <div>{{ customer.postalCode }} {{ customer.city }}</div>
+    <div>{{ customer.country }}</div>
+
+    {% if customer.company %}
+        <div>Société : {{ customer.company }}</div>
+    {% endif %}
+
+    {% if customer.siret %}
+        <div>SIRET : {{ customer.siret }}</div>
+    {% endif %}
+</div>
+
+<table>
+    <thead>
+    <tr>
+        <th>Produit</th>
+        <th class="right">Prix unitaire</th>
+        <th class="right">Quantité</th>
+        <th class="right">Total</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for item in items %}
+        <tr>
+            <td>{{ item.title }}</td>
+            <td class="right">{{ item.unitPrice|number_format(2, ',', ' ') }} €</td>
+            <td class="right">{{ item.quantity }}</td>
+            <td class="right">{{ item.lineTotal|number_format(2, ',', ' ') }} €</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<table class="totals">
+    <tr>
+        <td>Sous-total</td>
+        <td class="right">{{ subtotal|number_format(2, ',', ' ') }} €</td>
+    </tr>
+    <tr>
+        <td>Remise</td>
+        <td class="right">- {{ promo|number_format(2, ',', ' ') }} €</td>
+    </tr>
+    <tr class="total-final">
+        <td>Total</td>
+        <td class="right">{{ total|number_format(2, ',', ' ') }} €</td>
+    </tr>
+</table>
+</body>
+</html>

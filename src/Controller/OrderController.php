@@ -417,7 +417,7 @@ class OrderController extends AbstractController
             return new JsonResponse(['error' => 'order not found'], 404);
         }
 
-        if ($order->getStatus() === 'paid') {
+        if ($order->getStatus() === 'Payé') {
             return new JsonResponse(['message' => 'already processed']);
         }
 
@@ -435,7 +435,7 @@ class OrderController extends AbstractController
             $product->setInStock($newStock);
         }
 
-        $order->setStatus('paid');
+        $order->setStatus('Payé');
         $order->setPaymentDate(new \DateTime());
 
         $em->flush();
