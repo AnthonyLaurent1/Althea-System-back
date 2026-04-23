@@ -9,7 +9,10 @@ use App\Entity\Items;
 use App\Entity\User;
 use App\Repository\OrdersRepository;
 use App\Repository\ProductRepository;
+use App\Service\StripeService;
 use Doctrine\ORM\EntityManagerInterface;
+use Stripe\Exception\ApiErrorException;
+use Stripe\Webhook;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -24,21 +27,16 @@ class OrderController extends AbstractController
         $subtotal = 0;
 
         foreach ($order->getItems() as $item) {
-            if ($item->getProduct()->getInStock() > 0) {
-                $subtotal += $item->getPrice() * $item->getQuantity();
-            }
-        }
+            $subtotal += (int) round($item->getPrice() * 100) * $item->getQuantity();        }
 
-        $tva = $subtotal * 0.20;
         $promo = $subtotal > 100 ? 10 : 0;
 
-        $total = $subtotal + $tva - $promo;
+        $total = $subtotal - $promo;
 
         return [
-            'subtotal' => $subtotal,
-            'tva' => $tva,
+            'subtotal' => round($subtotal, 2),
             'promo' => $promo,
-            'total' => $total
+            'total' => $total / 100
         ];
     }
 
@@ -146,7 +144,6 @@ class OrderController extends AbstractController
         return $this->json([
             'message' => 'Item ajouté',
             'totalPrice' => $totals['total'],
-            'tva' => $totals['tva'],
             'promo' => $totals['promo']
         ]);
     }
@@ -204,7 +201,6 @@ class OrderController extends AbstractController
             'userId' => $order->getUser()->getId(),
             'status' => $order->getStatus(),
             'totalPrice' => $totals['total'],
-            'tva' => $totals['tva'],
             'promo' => $totals['promo'],
             'items' => $items
         ]);
@@ -265,7 +261,6 @@ class OrderController extends AbstractController
         return $this->json([
             'message' => 'Quantités mises à jour',
             'totalPrice' => $totals['total'],
-            'tva' => $totals['tva'],
             'promo' => $totals['promo']
         ]);
     }
@@ -299,6 +294,7 @@ class OrderController extends AbstractController
         $order->getItems()->removeElement($item);
 
         $totals = $this->calculateTotal($order);
+        $order->setTotalPrice($totals['total']);
 
         $em->flush();
 
@@ -308,9 +304,12 @@ class OrderController extends AbstractController
         ]);
     }
 
+    /**
+     * @throws ApiErrorException
+     */
     #[Route('/checkout', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    public function checkout(EntityManagerInterface $em): JsonResponse
+    public function checkout(EntityManagerInterface $em, StripeService $stripeService): JsonResponse
     {
         $user = $this->getRealUser();
 
@@ -328,34 +327,113 @@ class OrderController extends AbstractController
         }
 
         foreach ($order->getItems() as $item) {
-            if ($item->getProduct()->getInStock() <= 0) {
+            $product = $item->getProduct();
+
+            if ($product->getInStock() <= 0) {
                 return $this->json([
-                    'error' => "Produit indisponible : {$item->getProduct()->getTitle()}"
+                    'error' => "Produit indisponible : {$product->getTitle()}"
                 ], 400);
             }
 
-            if ($item->getProduct()->getInStock() < $item->getQuantity()) {
+            if ($product->getInStock() < $item->getQuantity()) {
                 return $this->json([
-                    'error' => "Stock insuffisant pour {$item->getProduct()->getTitle()}"
+                    'error' => "Stock insuffisant pour {$product->getTitle()}"
                 ], 400);
             }
         }
 
-        $order->setStatus('pending');
-        $order->setPaymentDate(new \DateTime());
+        $totals = $this->calculateTotal($order);
+        $order->setTotalPrice($totals['total']);
 
-        $em->flush();
-
-        return $this->json([
-            'message' => 'Commande validée',
-            'orderId' => $order->getId()
-        ]);
+        return $this->createStripeSession($order, $stripeService);
     }
-
     private function getRealUser(): ?User
     {
         $user = $this->getUser();
 
         return $user instanceof User ? $user : null;
+    }
+
+    /**
+     * @throws ApiErrorException
+     */
+    private function createStripeSession(Orders $order, StripeService $stripeService): JsonResponse
+    {
+        $items = [];
+
+        foreach ($order->getItems() as $item) {
+            $items[] = [
+                'name' => $item->getProduct()->getTitle(),
+                'price' => $item->getPrice(),
+                'quantity' => $item->getQuantity(),
+            ];
+        }
+
+        $session = $stripeService->createCheckoutSession(
+            $items,
+            'http://localhost:8000/api/order/success?session_id={CHECKOUT_SESSION_ID}',
+            'http://localhost:3000/cancel',
+            $order->getId()
+        );
+
+        return $this->json([
+            'message' => 'Redirection vers Stripe',
+            'orderId' => $order->getId(),
+            'url' => $session->url
+        ]);
+    }
+
+    #[Route('/stripe/webhook', methods: ['POST'])]
+    public function stripeWebhook(Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        $endpointSecret = $_ENV['STRIPE_WEBHOOK_SECRET'];
+
+        $payload = $request->getContent();
+        $sigHeader = $request->headers->get('Stripe-Signature');
+
+        try {
+            $event = Webhook::constructEvent(
+                $payload,
+                $sigHeader,
+                $endpointSecret
+            );
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Webhook invalide'], 400);
+        }
+
+        if ($event->type === 'checkout.session.completed') {
+
+            $session = $event->data->object;
+
+            $orderId = $session->metadata->orderId ?? null;
+
+            if (!$orderId) {
+                return $this->json(['error' => 'OrderId manquant'], 400);
+            }
+
+            $order = $em->getRepository(Orders::class)->find($orderId);
+
+            if (!$order) {
+                return $this->json(['error' => 'Commande introuvable'], 404);
+            }
+
+            $order->setStatus('paid');
+            $order->setPaymentDate(new \DateTime());
+
+            $em->flush();
+        }
+
+        return $this->json(['received' => true]);
+    }
+
+    #[Route('/success', methods: ['GET'])]
+    public function success(Request $request): JsonResponse
+    {
+        $sessionId = $request->query->get('session_id');
+
+        return $this->json([
+            'message' => 'Paiement réussi',
+            'session_id' => $sessionId
+        ]);
     }
 }
