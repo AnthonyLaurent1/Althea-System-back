@@ -6,6 +6,7 @@ use App\Entity\Product;
 use App\Dto\ProductDto;
 use App\Dto\DiscountDto;
 use App\Dto\CategorySimpleDto;
+use App\Entity\ProductTranslation;
 use App\Repository\ProductRepository;
 use App\Repository\CategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -19,18 +20,22 @@ use Symfony\Component\Routing\Attribute\Route;
 class ProductController extends AbstractController
 {
     #[Route('', name: 'api_product_index', methods: ['GET'])]
-    public function index(ProductRepository $repository): JsonResponse
+    public function index(ProductRepository $repository, Request $request): JsonResponse
     {
+        $locale = $request->query->get('locale', 'fr');
+
         $products = $repository->findAll();
-        $data = array_map(fn(Product $p) => $this->transformToDto($p), $products);
+        $data = array_map(fn(Product $p) => $this->transformToDto($p, $locale), $products);
 
         return $this->json($data);
     }
 
     #[Route('/{id}', name: 'api_product_show', methods: ['GET'])]
-    public function show(Product $product): JsonResponse
+    public function show(Product $product, Request $request): JsonResponse
     {
-        return $this->json($this->transformToDto($product));
+        $locale = $request->query->get('locale', 'fr');
+
+        return $this->json($this->transformToDto($product, $locale));
     }
 
     #[Route('', name: 'api_product_create', methods: ['POST'])]
@@ -42,6 +47,9 @@ class ProductController extends AbstractController
         $this->hydrateProduct($product, $data, $catRepo);
 
         $em->persist($product);
+
+        $this->syncProductTranslations($product, $data['translations'] ?? [], $em);
+
         $em->flush();
 
         return $this->json($this->transformToDto($product), Response::HTTP_CREATED);
@@ -53,14 +61,18 @@ class ProductController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $this->hydrateProduct($product, $data, $catRepo);
 
+        $this->syncProductTranslations($product, $data['translations'] ?? [], $em);
+
         $em->flush();
 
         return $this->json($this->transformToDto($product));
     }
 
     #[Route('/{id}/similar', name: 'api_product_similar', methods: ['GET'])]
-    public function getSimilarProducts(Product $product, ProductRepository $repository): JsonResponse
+    public function getSimilarProducts(Product $product, ProductRepository $repository, Request $request): JsonResponse
     {
+        $locale = $request->query->get('locale', 'fr');
+
         $domain = $product->getMedicalDomain();
         $category = $product->getCategory();
 
@@ -82,7 +94,7 @@ class ProductController extends AbstractController
 
         $finalList = array_slice($filtered, 0, 6);
 
-        $data = array_map(fn(Product $p) => $this->transformToDto($p), $finalList);
+        $data = array_map(fn(Product $p) => $this->transformToDto($p, $locale), $finalList);
 
         return $this->json($data);
     }
@@ -90,6 +102,7 @@ class ProductController extends AbstractController
     #[Route('/search', name: 'api_product_search', methods: ['GET'])]
     public function search(Request $request, ProductRepository $repository): JsonResponse
     {
+        $locale = $request->query->get('locale', 'fr');
         $searchTerm = $request->query->get('q', '');
 
         if (strlen($searchTerm) < 2) {
@@ -98,7 +111,7 @@ class ProductController extends AbstractController
 
         $products = $repository->searchByTitle($searchTerm);
 
-        $data = array_map(fn(Product $p) => $this->transformToDto($p), $products);
+        $data = array_map(fn(Product $p) => $this->transformToDto($p, $locale), $products);
 
         return $this->json($data);
     }
@@ -106,8 +119,25 @@ class ProductController extends AbstractController
     /**
      * TRANSFORMATION : Entité -> DTO
      */
-    private function transformToDto(Product $product): ProductDto
+    private function transformToDto(Product $product, string $locale = 'fr'): ProductDto
     {
+        $title = $product->getTitle();
+        $description = $product->getDescription() ?? '';
+        $powerSupplyType = $product->getPowerSupplyType() ?? 'N/A';
+        $medicalDomain = $product->getMedicalDomain() ?? 'N/A';
+
+        if ($locale !== 'fr') {
+            foreach ($product->getTranslations() as $translation) {
+                if ($translation->getLocale() === $locale) {
+                    $title = $translation->getTitle() ?? $title;
+                    $description = $translation->getDescription() ?? $description;
+                    $powerSupplyType = $translation->getPowerSupplyType() ?? $powerSupplyType;
+                    $medicalDomain = $translation->getMedicalDomain() ?? $medicalDomain;
+                    break;
+                }
+            }
+        }
+
         $discountDtos = [];
         foreach ($product->getDiscounts() as $discount) {
             $discountDtos[] = new DiscountDto(
@@ -118,28 +148,77 @@ class ProductController extends AbstractController
             );
         }
 
-        $cat = $product->getCategory();
+        $categoryEntity = $product->getCategory();
+        $categoryTitle = $categoryEntity->getTitle();
+
+        if ($locale !== 'fr') {
+            foreach ($categoryEntity->getTranslations() as $translation) {
+                if ($translation->getLocale() === $locale) {
+                    $categoryTitle = $translation->getTitle();
+                    break;
+                }
+            }
+        }
+
         $categorySimpleDto = new CategorySimpleDto(
-            $cat->getId(),
-            $cat->getTitle(),
-            $cat->getPictureUrl()
+            $categoryEntity->getId(),
+            $categoryTitle,
+            $categoryEntity->getPictureUrl()
         );
 
         return new ProductDto(
             $product->getId(),
-            $product->getTitle(),
-            $product->getDescription() ?? '',
+            $title,
+            $description,
             $product->getPrice(),
             $product->getPictureUrl() ?? '',
             $product->getInStock() ?? 0,
             $product->isPublished() ?? false,
             $product->isPortable() ?? false,
             $product->isOneTimeUse() ?? false,
-            $product->getPowerSupplyType() ?? 'N/A',
-            $product->getMedicalDomain() ?? 'N/A',
+            $powerSupplyType,
+            $medicalDomain,
             $categorySimpleDto,
             $discountDtos
         );
+    }
+
+
+    private function syncProductTranslations(Product $product, array $translations, EntityManagerInterface $em): void
+    {
+        foreach ($translations as $locale => $translationData) {
+            $existingTranslation = null;
+
+            foreach ($product->getTranslations() as $translation) {
+                if ($translation->getLocale() === $locale) {
+                    $existingTranslation = $translation;
+                    break;
+                }
+            }
+
+            if (!$existingTranslation) {
+                $existingTranslation = new ProductTranslation();
+                $existingTranslation->setProduct($product);
+                $existingTranslation->setLocale($locale);
+                $em->persist($existingTranslation);
+            }
+
+            if (array_key_exists('title', $translationData)) {
+                $existingTranslation->setTitle($translationData['title']);
+            }
+
+            if (array_key_exists('description', $translationData)) {
+                $existingTranslation->setDescription($translationData['description']);
+            }
+
+            if (array_key_exists('powerSupplyType', $translationData)) {
+                $existingTranslation->setPowerSupplyType($translationData['powerSupplyType']);
+            }
+
+            if (array_key_exists('medicalDomain', $translationData)) {
+                $existingTranslation->setMedicalDomain($translationData['medicalDomain']);
+            }
+        }
     }
 
     /**

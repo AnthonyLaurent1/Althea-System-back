@@ -7,6 +7,7 @@ use App\Dto\CategorySimpleDto;
 use App\Dto\DiscountDto;
 use App\Entity\Category;
 use App\Dto\ProductDto;
+use App\Entity\CategoryTranslation;
 use App\Entity\Product;
 use App\Repository\CategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,18 +21,22 @@ use Symfony\Component\Routing\Attribute\Route;
 class CategoryController extends AbstractController
 {
     #[Route('', name: 'api_category_index', methods: ['GET'])]
-    public function index(CategoryRepository $repository): JsonResponse
+    public function index(CategoryRepository $repository, Request $request): JsonResponse
     {
+        $locale = $request->query->get('locale', 'fr');
+
         $categories = $repository->findAll();
-        $data = array_map(fn(Category $c) => $this->transformCategoryToDto($c), $categories);
+        $data = array_map(fn(Category $c) => $this->transformCategoryToDto($c, $locale), $categories);
 
         return $this->json($data);
     }
 
     #[Route('/{id}', name: 'api_category_show', methods: ['GET'])]
-    public function show(Category $category): JsonResponse
+    public function show(Category $category, Request $request): JsonResponse
     {
-        return $this->json($this->transformCategoryToDto($category));
+        $locale = $request->query->get('locale', 'fr');
+
+        return $this->json($this->transformCategoryToDto($category, $locale));
     }
 
     #[Route('', name: 'api_category_create', methods: ['POST'])]
@@ -40,9 +45,12 @@ class CategoryController extends AbstractController
         $data = json_decode($request->getContent(), true);
 
         $category = new Category();
-        $this->hydrateCategory($category, $data);
 
+        $this->hydrateCategory($category, $data);
         $em->persist($category);
+
+        $this->syncCategoryTranslations($category, $data['translations'] ?? [], $em);
+
         $em->flush();
 
         return $this->json($this->transformCategoryToDto($category), Response::HTTP_CREATED);
@@ -54,17 +62,21 @@ class CategoryController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $this->hydrateCategory($category, $data);
 
+        $this->syncCategoryTranslations($category, $data['translations'] ?? [], $em);
+
         $em->flush();
 
         return $this->json($this->transformCategoryToDto($category));
     }
 
     #[Route('/{id}/products', name: 'api_category_products', methods: ['GET'])]
-    public function getProductsByCategory(Category $category): JsonResponse
+    public function getProductsByCategory(Category $category, Request $request): JsonResponse
     {
+        $locale = $request->query->get('locale', 'fr');
+
         $products = $category->getProducts();
 
-        $data = array_map(fn(Product $p) => $this->transformProductToDto($p), $products->toArray());
+        $data = array_map(fn(Product $p) => $this->transformProductToDto($p, $locale), $products->toArray());
 
         return $this->json($data);
     }
@@ -73,16 +85,27 @@ class CategoryController extends AbstractController
     /**
      * Transforme une Catégorie en CategoryDto
      */
-    private function transformCategoryToDto(Category $category): CategoryDto
+    private function transformCategoryToDto(Category $category, string $locale = 'fr'): CategoryDto
     {
+        $title = $category->getTitle();
+
+        if ($locale !== 'fr') {
+            foreach ($category->getTranslations() as $translation) {
+                if ($translation->getLocale() === $locale) {
+                    $title = $translation->getTitle();
+                    break;
+                }
+            }
+        }
+
         $productDtos = [];
         foreach ($category->getProducts() as $product) {
-            $productDtos[] = $this->transformProductToDto($product);
+            $productDtos[] = $this->transformProductToDto($product, $locale);
         }
 
         return new CategoryDto(
             $category->getId(),
-            $category->getTitle(),
+            $title,
             $category->getPictureUrl(),
             $productDtos
         );
@@ -91,8 +114,43 @@ class CategoryController extends AbstractController
     /**
      * Transforme un Produit en ProductDto
      */
-    private function transformProductToDto(Product $product): ProductDto
+    private function transformProductToDto(Product $product, string $locale = 'fr'): ProductDto
     {
+        $title = $product->getTitle();
+        $description = $product->getDescription() ?? '';
+        $powerSupplyType = $product->getPowerSupplyType() ?? 'N/A';
+        $medicalDomain = $product->getMedicalDomain() ?? 'N/A';
+
+        if ($locale !== 'fr') {
+            foreach ($product->getTranslations() as $translation) {
+                if ($translation->getLocale() === $locale) {
+                    $title = $translation->getTitle() ?? $title;
+                    $description = $translation->getDescription() ?? $description;
+                    $powerSupplyType = $translation->getPowerSupplyType() ?? $powerSupplyType;
+                    $medicalDomain = $translation->getMedicalDomain() ?? $medicalDomain;
+                    break;
+                }
+            }
+        }
+
+        $categoryEntity = $product->getCategory();
+        $categoryTitle = $categoryEntity->getTitle();
+
+        if ($locale !== 'fr') {
+            foreach ($categoryEntity->getTranslations() as $translation) {
+                if ($translation->getLocale() === $locale) {
+                    $categoryTitle = $translation->getTitle();
+                    break;
+                }
+            }
+        }
+
+        $categorySimpleDto = new CategorySimpleDto(
+            $categoryEntity->getId(),
+            $categoryTitle,
+            $categoryEntity->getPictureUrl()
+        );
+
         $discountDtos = [];
         foreach ($product->getDiscounts() as $discount) {
             $discountDtos[] = new DiscountDto(
@@ -103,28 +161,47 @@ class CategoryController extends AbstractController
             );
         }
 
-        $categoryEntity = $product->getCategory();
-        $categorySimpleDto = new CategorySimpleDto(
-            $categoryEntity->getId(),
-            $categoryEntity->getTitle(),
-            $categoryEntity->getPictureUrl()
-        );
-
         return new ProductDto(
             $product->getId(),
-            $product->getTitle(),
-            $product->getDescription() ?? '',
+            $title,
+            $description,
             $product->getPrice(),
             $product->getPictureUrl() ?? '',
             $product->getInStock() ?? 0,
             $product->isPublished() ?? false,
             $product->isPortable() ?? false,
             $product->isOneTimeUse() ?? false,
-            $product->getPowerSupplyType() ?? 'N/A',
-            $product->getMedicalDomain() ?? 'N/A',
+            $powerSupplyType,
+            $medicalDomain,
             $categorySimpleDto,
             $discountDtos
         );
+    }
+
+    private function syncCategoryTranslations(Category $category, array $translations, EntityManagerInterface $em): void
+    {
+        foreach ($translations as $locale => $translationData) {
+            if (empty($translationData['title'])) {
+                continue;
+            }
+
+            $existing = null;
+            foreach ($category->getTranslations() as $translation) {
+                if ($translation->getLocale() === $locale) {
+                    $existing = $translation;
+                    break;
+                }
+            }
+
+            if (!$existing) {
+                $existing = new CategoryTranslation();
+                $existing->setCategory($category);
+                $existing->setLocale($locale);
+                $em->persist($existing);
+            }
+
+            $existing->setTitle($translationData['title']);
+        }
     }
 
 

@@ -32,9 +32,16 @@ class Category
 
     private Collection $products;
 
+    /**
+     * @var Collection<int, CategoryTranslation>
+     */
+    #[ORM\OneToMany(targetEntity: CategoryTranslation::class, mappedBy: 'category', cascade: ['persist', 'remove'])]
+    private Collection $translations;
+
     public function __construct()
     {
         $this->products = new ArrayCollection();
+        $this->translations = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -87,6 +94,36 @@ class Category
         if ($this->products->removeElement($product)) {
             if ($product->getCategory() === $this) {
                 $product->setCategory(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, CategoryTranslation>
+     */
+    public function getTranslations(): Collection
+    {
+        return $this->translations;
+    }
+
+    public function addTranslation(CategoryTranslation $translation): static
+    {
+        if (!$this->translations->contains($translation)) {
+            $this->translations->add($translation);
+            $translation->setCategory($this);
+        }
+
+        return $this;
+    }
+
+    public function removeTranslation(CategoryTranslation $translation): static
+    {
+        if ($this->translations->removeElement($translation)) {
+            // set the owning side to null (unless already changed)
+            if ($translation->getCategory() === $this) {
+                $translation->setCategory(null);
             }
         }
 

@@ -14,7 +14,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 #[AsCommand(name: 'app:seed-data', description: 'Génère 3 catégories et 15 produits automatiquement')]
 class SeedDataCommand extends Command
 {
-    public function __construct(private EntityManagerInterface $entityManager) {
+    public function __construct(private readonly EntityManagerInterface $entityManager) {
         parent::__construct();
     }
 

@@ -55,9 +55,16 @@ class Product
     #[ORM\OneToMany(targetEntity: Discount::class, mappedBy: 'product')]
     private Collection $discounts;
 
+    /**
+     * @var Collection<int, ProductTranslation>
+     */
+    #[ORM\OneToMany(targetEntity: ProductTranslation::class, mappedBy: 'product', cascade: ['persist', 'remove'])]
+    private Collection $translations;
+
     public function __construct()
     {
         $this->discounts = new ArrayCollection();
+        $this->translations = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -210,6 +217,36 @@ class Product
                 $discount->setProduct(null);
             }
         }
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, ProductTranslation>
+     */
+    public function getTranslations(): Collection
+    {
+        return $this->translations;
+    }
+
+    public function addTranslation(ProductTranslation $translation): static
+    {
+        if (!$this->translations->contains($translation)) {
+            $this->translations->add($translation);
+            $translation->setProduct($this);
+        }
+
+        return $this;
+    }
+
+    public function removeTranslation(ProductTranslation $translation): static
+    {
+        if ($this->translations->removeElement($translation)) {
+            // set the owning side to null (unless already changed)
+            if ($translation->getProduct() === $this) {
+                $translation->setProduct(null);
+            }
+        }
+
         return $this;
     }
 }

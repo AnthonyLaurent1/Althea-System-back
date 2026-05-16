@@ -10,7 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Auto-generated Migration: Please modify to your needs!
  */
-final class Version20260319124629 extends AbstractMigration
+final class Version20260516144126 extends AbstractMigration
 {
     public function getDescription(): string
     {
@@ -31,6 +31,8 @@ final class Version20260319124629 extends AbstractMigration
         $this->addSql('ALTER TABLE items ADD CONSTRAINT FK_E11EE94DCFFE9AD6 FOREIGN KEY (orders_id) REFERENCES orders (id)');
         $this->addSql('ALTER TABLE orders ADD CONSTRAINT FK_E52FFDEEA76ED395 FOREIGN KEY (user_id) REFERENCES user (id)');
         $this->addSql('ALTER TABLE product ADD CONSTRAINT FK_D34A04AD12469DE2 FOREIGN KEY (category_id) REFERENCES category (id)');
+        $this->addSql('ALTER TABLE category_translation ADD CONSTRAINT FK_3F2070412469DE2 FOREIGN KEY (category_id) REFERENCES category (id)');
+        $this->addSql('ALTER TABLE product_translation ADD CONSTRAINT FK_1846DB704584665A FOREIGN KEY (product_id) REFERENCES product (id)');
     }
 
     public function down(Schema $schema): void
@@ -47,5 +49,7 @@ final class Version20260319124629 extends AbstractMigration
         $this->addSql('DROP TABLE orders');
         $this->addSql('DROP TABLE product');
         $this->addSql('DROP TABLE user');
+        $this->addSql('ALTER TABLE category_translation DROP FOREIGN KEY FK_3F2070412469DE2');
+        $this->addSql('ALTER TABLE product_translation DROP FOREIGN KEY FK_1846DB704584665A');
     }
 }
