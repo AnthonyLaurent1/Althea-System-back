@@ -1,25 +1,80 @@
-
 services:
-###> doctrine/doctrine-bundle ###
-  database:
-    image: postgres:${POSTGRES_VERSION:-16}-alpine
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: althea-system-back-app
+    restart: unless-stopped
+    working_dir: /app
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-      # You should definitely change the password in production
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
-      POSTGRES_USER: ${POSTGRES_USER:-app}
-    healthcheck:
-      test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB:-app}", "-U", "${POSTGRES_USER:-app}"]
-      timeout: 5s
-      retries: 5
-      start_period: 60s
+      APP_ENV: dev
+      APP_SECRET: 2a506ece1a380d9cd74d975ecdbff83e
+      DATABASE_URL: "mysql://app:!ChangeMe!@database:3306/althea_system?serverVersion=8.0.36&charset=utf8mb4"
+      MAILER_DSN: "smtp://mailhog:1025"
+      JWT_SECRET_KEY: "/app/config/jwt/private.pem"
+      JWT_PUBLIC_KEY: "/app/config/jwt/public.pem"
+      JWT_PASSPHRASE: "althea-jwt-passphrase"
+      CORS_ALLOW_ORIGIN: "^https?://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?$$"
     volumes:
-      - database_data:/var/lib/postgresql/data:rw
-      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
-      # - ./docker/db/data:/var/lib/postgresql/data:rw
-###< doctrine/doctrine-bundle ###
+      - ./:/app:Z
+      - vendor:/app/vendor
+      - var:/app/var
+      - jwt:/app/config/jwt
+    depends_on:
+      database:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/app:ro,Z
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro,Z
+    depends_on:
+      - app
+
+  database:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: althea_system
+      MYSQL_USER: app
+      MYSQL_PASSWORD: "!ChangeMe!"
+      MYSQL_ROOT_PASSWORD: root
+    command: --default-authentication-plugin=mysql_native_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: database
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+    depends_on:
+      database:
+        condition: service_healthy
 
 volumes:
-###> doctrine/doctrine-bundle ###
-  database_data:
-###< doctrine/doctrine-bundle ###
+  db:
+  vendor:
+  var:
+  jwt:
