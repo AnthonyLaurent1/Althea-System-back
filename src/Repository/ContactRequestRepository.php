@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\ContactRequest;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Tools\Pagination\Paginator;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -16,28 +17,21 @@ class ContactRequestRepository extends ServiceEntityRepository
         parent::__construct($registry, ContactRequest::class);
     }
 
-//    /**
-//     * @return ContactRequest[] Returns an array of ContactRequest objects
-//     */
-//    public function findByExampleField($value): array
-//    {
-//        return $this->createQueryBuilder('c')
-//            ->andWhere('c.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->orderBy('c.id', 'ASC')
-//            ->setMaxResults(10)
-//            ->getQuery()
-//            ->getResult()
-//        ;
-//    }
+    /**
+     * @return Paginator<ContactRequest>
+     */
+    public function paginate(?string $status, int $page, int $limit): Paginator
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->orderBy('c.createdAt', 'DESC');
 
-//    public function findOneBySomeField($value): ?ContactRequest
-//    {
-//        return $this->createQueryBuilder('c')
-//            ->andWhere('c.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->getQuery()
-//            ->getOneOrNullResult()
-//        ;
-//    }
+        if ($status !== null && $status !== '') {
+            $qb->andWhere('c.status = :status')->setParameter('status', $status);
+        }
+
+        $qb->setFirstResult(($page - 1) * $limit)
+            ->setMaxResults($limit);
+
+        return new Paginator($qb->getQuery());
+    }
 }

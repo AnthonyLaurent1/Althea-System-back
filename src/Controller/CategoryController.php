@@ -16,6 +16,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/categories')]
 class CategoryController extends AbstractController
@@ -25,7 +26,7 @@ class CategoryController extends AbstractController
     {
         $locale = $request->query->get('locale', 'fr');
 
-        $categories = $repository->findAll();
+        $categories = $repository->findBy([], ['displayOrder' => 'ASC', 'id' => 'ASC']);
         $data = array_map(fn(Category $c) => $this->transformCategoryToDto($c, $locale), $categories);
 
         return $this->json($data);
@@ -40,6 +41,7 @@ class CategoryController extends AbstractController
     }
 
     #[Route('', name: 'api_category_create', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function create(Request $request, EntityManagerInterface $em): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -56,7 +58,33 @@ class CategoryController extends AbstractController
         return $this->json($this->transformCategoryToDto($category), Response::HTTP_CREATED);
     }
 
-    #[Route('/{id}', name: 'api_category_update', methods: ['PUT', 'PATCH'])]
+    #[Route('/reorder', name: 'api_category_reorder', methods: ['PATCH'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function reorder(Request $request, EntityManagerInterface $em, CategoryRepository $repository): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || !isset($data['orderedIds']) || !is_array($data['orderedIds'])) {
+            return $this->json(['error' => 'Le champ "orderedIds" est requis.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $position = 0;
+        foreach ($data['orderedIds'] as $id) {
+            $category = $repository->find((int) $id);
+            if ($category !== null) {
+                $category->setDisplayOrder($position);
+                ++$position;
+            }
+        }
+
+        $em->flush();
+
+        $categories = $repository->findBy([], ['displayOrder' => 'ASC', 'id' => 'ASC']);
+
+        return $this->json(array_map(fn(Category $c) => $this->transformCategoryToDto($c), $categories));
+    }
+
+    #[Route('/{id}', name: 'api_category_update', requirements: ['id' => '\d+'], methods: ['PUT', 'PATCH'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function update(Category $category, Request $request, EntityManagerInterface $em): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -67,6 +95,23 @@ class CategoryController extends AbstractController
         $em->flush();
 
         return $this->json($this->transformCategoryToDto($category));
+    }
+
+    #[Route('/{id}', name: 'api_category_delete', requirements: ['id' => '\d+'], methods: ['DELETE'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function delete(Category $category, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$category->getProducts()->isEmpty()) {
+            return $this->json(
+                ['error' => 'Impossible de supprimer une catégorie contenant des produits.'],
+                Response::HTTP_CONFLICT
+            );
+        }
+
+        $em->remove($category);
+        $em->flush();
+
+        return $this->json(['message' => 'Catégorie supprimée']);
     }
 
     #[Route('/{id}/products', name: 'api_category_products', methods: ['GET'])]
@@ -107,7 +152,8 @@ class CategoryController extends AbstractController
             $category->getId(),
             $title,
             $category->getPictureUrl(),
-            $productDtos
+            $productDtos,
+            $category->getDisplayOrder()
         );
     }
 
@@ -209,5 +255,9 @@ class CategoryController extends AbstractController
     {
         $category->setTitle($data['title'] ?? $category->getTitle());
         $category->setPictureUrl($data['pictureUrl'] ?? $category->getPictureUrl());
+
+        if (array_key_exists('displayOrder', $data)) {
+            $category->setDisplayOrder((int) $data['displayOrder']);
+        }
     }
 }
