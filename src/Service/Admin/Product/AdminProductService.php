@@ -10,6 +10,7 @@ use App\Dto\Admin\Product\ProductUpsertResponseDto;
 use App\Dto\Admin\Product\UpdateProductDto;
 use App\Entity\Discount;
 use App\Entity\Product;
+use App\Entity\ProductTranslation;
 use App\Exception\ProductDeletionNotAllowedException;
 use App\Repository\CategoryRepository;
 use App\Repository\ItemsRepository;
@@ -69,6 +70,7 @@ final class AdminProductService
         $this->hydrateProduct($product, $dto->title, $dto->description, $dto->price, $dto->pictureUrl, $dto->categoryId, $dto->isPublished, $dto->powerSupplyType, $dto->medicalDomain, $dto->isPortable, $dto->isOneTimeUse, $dto->inStock);
 
         $this->entityManager->persist($product);
+        $this->syncProductTranslations($product, $dto->translations);
         $this->entityManager->flush();
 
         return new ProductUpsertResponseDto('Produit créé', $this->mapDetail($product));
@@ -90,6 +92,10 @@ final class AdminProductService
             $dto->isOneTimeUse ?? $product->isOneTimeUse(),
             $dto->inStock ?? $product->getInStock()
         );
+
+        if ($dto->translations !== null) {
+            $this->syncProductTranslations($product, $dto->translations);
+        }
 
         $this->entityManager->flush();
 
@@ -184,6 +190,16 @@ final class AdminProductService
             ];
         }
 
+        $translations = [];
+        foreach ($product->getTranslations() as $translation) {
+            $translations[$translation->getLocale()] = [
+                'title' => $translation->getTitle(),
+                'description' => $translation->getDescription(),
+                'powerSupplyType' => $translation->getPowerSupplyType(),
+                'medicalDomain' => $translation->getMedicalDomain(),
+            ];
+        }
+
         $category = $product->getCategory();
 
         return new AdminProductDetailDto(
@@ -204,6 +220,7 @@ final class AdminProductService
                 'pictureUrl' => $category->getPictureUrl(),
             ],
             $discounts,
+            $translations,
         );
     }
 
@@ -225,5 +242,34 @@ final class AdminProductService
         }
 
         return null;
+    }
+
+    private function syncProductTranslations(Product $product, array $translations): void
+    {
+        foreach ($translations as $locale => $translationData) {
+            if (empty($translationData['title'])) {
+                continue;
+            }
+
+            $existing = null;
+            foreach ($product->getTranslations() as $translation) {
+                if ($translation->getLocale() === $locale) {
+                    $existing = $translation;
+                    break;
+                }
+            }
+
+            if (!$existing) {
+                $existing = new ProductTranslation();
+                $existing->setProduct($product);
+                $existing->setLocale($locale);
+                $this->entityManager->persist($existing);
+            }
+
+            $existing->setTitle($translationData['title']);
+            $existing->setDescription($translationData['description'] ?? null);
+            $existing->setPowerSupplyType($translationData['powerSupplyType'] ?? null);
+            $existing->setMedicalDomain($translationData['medicalDomain'] ?? null);
+        }
     }
 }

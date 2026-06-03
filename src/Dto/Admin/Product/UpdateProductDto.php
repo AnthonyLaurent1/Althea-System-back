@@ -4,6 +4,9 @@ namespace App\Dto\Admin\Product;
 
 readonly class UpdateProductDto
 {
+    /**
+     * @param array<string, array<string, mixed>>|null $translations
+     */
     public function __construct(
         public ?string $title = null,
         public ?string $description = null,
@@ -16,6 +19,7 @@ readonly class UpdateProductDto
         public ?bool $isPortable = null,
         public ?bool $isOneTimeUse = null,
         public ?int $inStock = null,
+        public ?array $translations = null,
     ) {
     }
 }
