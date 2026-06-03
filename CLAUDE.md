@@ -220,6 +220,7 @@ enum OrderStatus: string
 - **Signaler** explicitement quand une demande violerait KISS, SOLID ou DRY, et proposer une alternative.
 - **Générer** les tests PHPUnit correspondants lorsqu'un Service ou une logique métier est créée.
 - **Documenter** les endpoints avec les attributs NelmioApiDoc si une route API est créée.
+- **Toujours** ajouter les endpoints qu'il crée dans le fichier Documentation/API_ROUTES.md
 - **Garder en mémoire** ses modifications, en modifiant la todo du fichier .claude/advancement.md
 
 ## Ce que Claude ne doit pas faire
