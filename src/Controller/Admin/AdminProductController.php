@@ -69,6 +69,7 @@ final class AdminProductController extends AbstractController
                 $this->boolOrDefault($data, 'isPortable', false),
                 $this->boolOrDefault($data, 'isOneTimeUse', false),
                 $this->requireInt($data, 'inStock'),
+                is_array($data['translations'] ?? null) ? $data['translations'] : [],
             );
 
             return $this->json($this->adminProductService->create($dto), Response::HTTP_CREATED);
@@ -95,6 +96,7 @@ final class AdminProductController extends AbstractController
                 $this->nullableBool($data, 'isPortable'),
                 $this->nullableBool($data, 'isOneTimeUse'),
                 $this->nullableInt($data, 'inStock'),
+                is_array($data['translations'] ?? null) ? $data['translations'] : null,
             );
 
             return $this->json($this->adminProductService->update($product, $dto));

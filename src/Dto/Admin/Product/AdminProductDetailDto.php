@@ -6,6 +6,7 @@ readonly class AdminProductDetailDto
 {
     /**
      * @param array<int, array<string, mixed>> $discounts
+     * @param array<string, array<string, mixed>> $translations
      */
     public function __construct(
         public int $id,
@@ -21,6 +22,7 @@ readonly class AdminProductDetailDto
         public bool $isOneTimeUse,
         public array $category,
         public array $discounts = [],
+        public array $translations = [],
     ) {
     }
 }
