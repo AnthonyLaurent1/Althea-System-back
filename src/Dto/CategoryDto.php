@@ -11,6 +11,7 @@ readonly class CategoryDto
         public int $id,
         public string $title,
         public ?string $pictureUrl,
-        public array $products = []
+        public array $products = [],
+        public int $displayOrder = 0
     ) {}
 }

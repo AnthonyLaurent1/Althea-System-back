@@ -694,3 +694,637 @@ Reponse:
 - PDF inline (`Content-Type: application/pdf`)
 - erreurs `401`, `403`, `404` ou `400` selon le cas
 
+## Carousel
+
+### GET `/api/carousel`
+
+Retourner tous les elements du carousel (public).
+
+Reponse:
+
+- tableau des elements du carousel avec images et order
+
+## Chatbot
+
+### POST `/api/chatbot/message`
+
+Envoyer un message au chatbot.
+
+Body JSON:
+
+```json
+{
+  "message": "Bonjour",
+  "sessionId": "optional-session-id"
+}
+```
+
+Champs obligatoires:
+
+- `message`
+
+Champs optionnels:
+
+- `sessionId`
+
+Reponse:
+
+- `response`: reponse du chatbot
+- `sessionId`: identifiant de session
+
+### POST `/api/chatbot/log`
+
+Enregistrer une interaction avec le chatbot.
+
+Body JSON:
+
+```json
+{
+  "message": "User message",
+  "response": "Chatbot response",
+  "sessionId": "session-id"
+}
+```
+
+Reponse:
+
+- message de confirmation
+
+### POST `/api/chatbot/escalate`
+
+Escalader une conversation chatbot vers un agent humain.
+
+Body JSON:
+
+```json
+{
+  "sessionId": "session-id",
+  "reason": "Need human support"
+}
+```
+
+Reponse:
+
+- message de confirmation
+
+## Contact
+
+### POST `/api/contact`
+
+Soumettre une demande de contact.
+
+Body JSON:
+
+```json
+{
+  "email": "user@example.com",
+  "name": "Jean Dupont",
+  "subject": "Demande d'info",
+  "message": "Je souhaite obtenir des infos..."
+}
+```
+
+Reponse:
+
+- `201` si creee avec succes
+- `400` si donnees invalides
+
+## Homepage
+
+### GET `/api/homepage/top-products`
+
+Retourner les produits mis en avant sur la page d'accueil.
+
+Query params:
+
+- `locale` optionnel: `fr`, `en`, `ru`
+
+Reponse:
+
+- tableau des top produits
+
+## Admin - Authentication
+
+### POST `/api/admin/auth/verify-2fa`
+
+Verifier le code 2FA pour un admin.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Body JSON:
+
+```json
+{
+  "challengeId": "challenge-id",
+  "code": "123456"
+}
+```
+
+Champs obligatoires:
+
+- `challengeId`
+- `code`
+
+Reponse:
+
+- `200` avec token JWT si valide
+- `401` si code invalide
+
+## Admin - Carousel
+
+### GET `/api/admin/carousel`
+
+Retourner tous les elements du carousel (admin).
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Reponse:
+
+- tableau de tous les elements carousel avec order
+
+### POST `/api/admin/carousel`
+
+Creer un nouvel element carousel.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Body JSON:
+
+```json
+{
+  "title": "Titre",
+  "description": "Description",
+  "imageUrl": "https://example.com/image.jpg",
+  "link": "https://example.com",
+  "order": 1
+}
+```
+
+Reponse:
+
+- `201` element cree
+
+### PATCH `/api/admin/carousel/reorder`
+
+Reordonner les elements du carousel.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Body JSON:
+
+```json
+{
+  "items": [
+    { "id": 1, "order": 3 },
+    { "id": 2, "order": 1 },
+    { "id": 3, "order": 2 }
+  ]
+}
+```
+
+Reponse:
+
+- `200` avec message de confirmation
+
+### PATCH|PUT `/api/admin/carousel/{id}`
+
+Mettre a jour un element carousel.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `id`: identifiant de l'element
+
+Body JSON:
+
+```json
+{
+  "title": "Nouveau titre",
+  "order": 2
+}
+```
+
+Reponse:
+
+- `200` avec element modifie
+
+### DELETE `/api/admin/carousel/{id}`
+
+Supprimer un element carousel.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `id`: identifiant de l'element
+
+Reponse:
+
+- `204` No Content
+
+## Admin - Chatbot
+
+### GET `/api/admin/chatbot/logs`
+
+Retourner tous les logs du chatbot.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Query params:
+
+- `limit` optionnel: nombre de logs a retourner
+- `offset` optionnel: pagination
+
+Reponse:
+
+- tableau de tous les logs chatbot
+
+### GET `/api/admin/chatbot/logs/{sessionId}`
+
+Retourner tous les logs d'une session chatbot.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `sessionId`: identifiant de la session
+
+Reponse:
+
+- tableau des logs pour cette session
+
+## Admin - Contact
+
+### GET `/api/admin/contact/messages`
+
+Retourner tous les messages de contact.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Query params:
+
+- `status` optionnel: filtre par statut
+- `limit` optionnel
+- `offset` optionnel
+
+Reponse:
+
+- tableau de tous les messages de contact
+
+### GET `/api/admin/contact/messages/{id}`
+
+Retourner un message de contact specifique.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `id`: identifiant du message
+
+Reponse:
+
+- objet message avec details
+
+### PATCH `/api/admin/contact/messages/{id}/status`
+
+Mettre a jour le statut d'un message de contact.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `id`: identifiant du message
+
+Body JSON:
+
+```json
+{
+  "status": "read"
+}
+```
+
+Reponse:
+
+- `200` avec message modifie
+
+### POST `/api/admin/contact/messages/{id}/reply`
+
+Envoyer une reponse a un message de contact.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `id`: identifiant du message
+
+Body JSON:
+
+```json
+{
+  "message": "Reponse a votre demande..."
+}
+```
+
+Reponse:
+
+- `201` avec confirmation
+
+## Admin - Dashboard
+
+### GET `/api/admin/dashboard/sales/daily`
+
+Retourner les ventes journalieres.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Reponse:
+
+- statistiques ventes du jour
+
+### GET `/api/admin/dashboard/sales/weekly`
+
+Retourner les ventes hebdomadaires.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Reponse:
+
+- statistiques ventes de la semaine par jour
+
+### GET `/api/admin/dashboard/sales/weekly-by-category`
+
+Retourner les ventes hebdomadaires par categorie.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Reponse:
+
+- ventes par categorie sur 7 jours
+
+### GET `/api/admin/dashboard/sales/category-share`
+
+Retourner la part de marche par categorie.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Reponse:
+
+- pourcentage ventes par categorie
+
+## Admin - Orders
+
+### GET `/api/admin/orders`
+
+Retourner toutes les commandes.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Query params:
+
+- `status` optionnel: filtre par statut
+- `limit` optionnel
+- `offset` optionnel
+
+Reponse:
+
+- tableau de toutes les commandes
+
+### GET `/api/admin/orders/{id}`
+
+Retourner les details d'une commande.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `id`: identifiant de la commande
+
+Reponse:
+
+- objet commande avec items et details
+
+### PATCH `/api/admin/orders/{id}/status`
+
+Mettre a jour le statut d'une commande.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `id`: identifiant de la commande
+
+Body JSON:
+
+```json
+{
+  "status": "shipped"
+}
+```
+
+Reponse:
+
+- `200` avec commande modifiee
+
+## Admin - Products
+
+### GET `/api/admin/products`
+
+Retourner tous les produits (admin).
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Query params:
+
+- `locale` optionnel: `fr`, `en`, `ru`
+- `limit` optionnel
+- `offset` optionnel
+
+Reponse:
+
+- tableau de tous les produits avec details complets
+
+### GET `/api/admin/products/{id}`
+
+Retourner un produit avec tous les details (admin).
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `id`: identifiant du produit
+
+Reponse:
+
+- objet produit avec toutes les donnees
+
+### POST `/api/admin/products`
+
+Creer un produit (voir section Produits pour body JSON complet).
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Reponse:
+
+- `201` produit cree
+
+### PATCH|PUT `/api/admin/products/{id}`
+
+Mettre a jour un produit (voir section Produits pour body JSON).
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `id`: identifiant du produit
+
+Reponse:
+
+- `200` avec produit modifie
+
+### DELETE `/api/admin/products/{id}`
+
+Supprimer un produit.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Parametre:
+
+- `id`: identifiant du produit
+
+Reponse:
+
+- `204` No Content
+
+### POST `/api/admin/products/bulk`
+
+Operations en masse sur les produits.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Body JSON:
+
+```json
+{
+  "action": "publish",
+  "ids": [1, 2, 3]
+}
+```
+
+Actions possibles:
+
+- `publish`: publier des produits
+- `unpublish`: depublier des produits
+- `delete`: supprimer en masse
+
+Reponse:
+
+- `200` avec nombre d'items modifies
+
+## Admin - Homepage
+
+### GET `/api/admin/homepage/top-products`
+
+Retourner les produits mis en avant (admin).
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Reponse:
+
+- tableau des top produits avec details
+
+### PUT `/api/admin/homepage/top-products`
+
+Remplacer les produits mis en avant.
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Body JSON:
+
+```json
+{
+  "productIds": [1, 3, 5, 7]
+}
+```
+
+Reponse:
+
+- `200` avec nouvelle liste
+
+## Admin - Upload
+
+### POST `/api/admin/upload`
+
+Uploader un fichier (image, PDF, etc).
+
+Authentification:
+
+- `ROLE_ADMIN` requis
+
+Content-Type:
+
+- `multipart/form-data`
+
+Body:
+
+- `file`: fichier a uploader
+
+Reponse:
+
+- `201` avec URL du fichier uploader
+- `400` si fichier invalide
+

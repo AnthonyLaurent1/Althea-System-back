@@ -25,6 +25,10 @@ class Category
     #[Groups(['category:read', 'category:write'])]
     private ?string $pictureUrl = null;
 
+    #[ORM\Column(options: ['default' => 0])]
+    #[Groups(['category:read', 'category:write'])]
+    private int $displayOrder = 0;
+
     /**
      * @var Collection<int, Product>
      */
@@ -68,6 +72,17 @@ class Category
     public function setPictureUrl(string $pictureUrl): static
     {
         $this->pictureUrl = $pictureUrl;
+        return $this;
+    }
+
+    public function getDisplayOrder(): int
+    {
+        return $this->displayOrder;
+    }
+
+    public function setDisplayOrder(int $displayOrder): static
+    {
+        $this->displayOrder = $displayOrder;
         return $this;
     }
 
