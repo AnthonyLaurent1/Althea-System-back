@@ -59,13 +59,13 @@ final class AdminProductController extends AbstractController
         try {
             $dto = new CreateProductDto(
                 $this->requireString($data, 'title'),
-                $this->requireString($data, 'description'),
+                $this->optionalString($data, 'description'),
                 $this->requireString($data, 'price'),
-                $this->requireString($data, 'pictureUrl'),
+                $this->optionalString($data, 'pictureUrl'),
                 $this->requireInt($data, 'categoryId'),
                 $this->boolOrDefault($data, 'isPublished', false),
-                $this->requireString($data, 'powerSupplyType'),
-                $this->requireString($data, 'medicalDomain'),
+                $this->optionalString($data, 'powerSupplyType'),
+                $this->optionalString($data, 'medicalDomain'),
                 $this->boolOrDefault($data, 'isPortable', false),
                 $this->boolOrDefault($data, 'isOneTimeUse', false),
                 $this->requireInt($data, 'inStock'),
@@ -180,6 +180,22 @@ final class AdminProductController extends AbstractController
         }
 
         throw new InvalidArgumentException(sprintf('Le champ "%s" est requis.', $key));
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function optionalString(array $data, string $key): string
+    {
+        if (!array_key_exists($key, $data) || $data[$key] === null) {
+            return '';
+        }
+
+        if (is_scalar($data[$key])) {
+            return (string) $data[$key];
+        }
+
+        return '';
     }
 
     /**

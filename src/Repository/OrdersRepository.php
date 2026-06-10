@@ -78,7 +78,7 @@ class OrdersRepository extends ServiceEntityRepository
                    SUM(o.total_price) AS total_revenue,
                    COUNT(o.id) AS orders_count
             FROM orders o
-            WHERE o.status = 'paid'
+            WHERE o.status = 'Payé'
               AND o.payment_date BETWEEN :start AND :end
             GROUP BY period_label
             ORDER BY period_label ASC
@@ -109,7 +109,7 @@ class OrdersRepository extends ServiceEntityRepository
             INNER JOIN items i ON i.orders_id = o.id
             INNER JOIN product p ON p.id = i.product_id
             INNER JOIN category c ON c.id = p.category_id
-            WHERE o.status = 'paid'
+            WHERE o.status = 'Payé'
               AND o.payment_date BETWEEN :start AND :end
             GROUP BY c.id, c.title, period_label
             ORDER BY c.title ASC, period_label ASC
@@ -137,7 +137,7 @@ class OrdersRepository extends ServiceEntityRepository
             INNER JOIN items i ON i.orders_id = o.id
             INNER JOIN product p ON p.id = i.product_id
             INNER JOIN category c ON c.id = p.category_id
-            WHERE o.status = 'paid'
+            WHERE o.status = 'Payé'
               AND o.payment_date BETWEEN :start AND :end
             GROUP BY c.id, c.title
             ORDER BY revenue DESC

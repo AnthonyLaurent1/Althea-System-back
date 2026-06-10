@@ -62,6 +62,13 @@ final class AdminTwoFactorService
             throw new \InvalidArgumentException('Utilisateur introuvable.');
         }
 
-        return ['token' => $this->jwtManager->create($user)];
+        return [
+            'token' => $this->jwtManager->create($user),
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'roles' => $user->getRoles(),
+            ]
+        ];
     }
 }

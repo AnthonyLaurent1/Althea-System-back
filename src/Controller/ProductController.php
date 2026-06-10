@@ -31,7 +31,7 @@ class ProductController extends AbstractController
         return $this->json($data);
     }
 
-    #[Route('/{id}', name: 'api_product_show', methods: ['GET'])]
+    #[Route('/{id}', name: 'api_product_show', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function show(Product $product, Request $request): JsonResponse
     {
         $locale = $request->query->get('locale', 'fr');
@@ -57,7 +57,7 @@ class ProductController extends AbstractController
         return $this->json($this->transformToDto($product), Response::HTTP_CREATED);
     }
 
-    #[Route('/{id}', name: 'api_product_update', methods: ['PUT', 'PATCH'])]
+    #[Route('/{id}', name: 'api_product_update', requirements: ['id' => '\d+'], methods: ['PUT', 'PATCH'])]
     #[IsGranted('ROLE_ADMIN')]
     public function update(Product $product, Request $request, EntityManagerInterface $em, CategoryRepository $catRepo): JsonResponse
     {
@@ -71,7 +71,7 @@ class ProductController extends AbstractController
         return $this->json($this->transformToDto($product));
     }
 
-    #[Route('/{id}/similar', name: 'api_product_similar', methods: ['GET'])]
+    #[Route('/{id}/similar', name: 'api_product_similar', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function getSimilarProducts(Product $product, ProductRepository $repository, Request $request): JsonResponse
     {
         $locale = $request->query->get('locale', 'fr');

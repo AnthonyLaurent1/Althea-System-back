@@ -125,3 +125,8 @@
   ⚠️ À faire avant exécution : `php bin/console doctrine:migrations:migrate`.
   Code NON exécuté ni linté ici (ni PHP ni base de données dans l'environnement).
   Le dépôt n'était PAS corrompu (fausse alerte initiale) — sources intactes, stash conservé.
+
+  ──────────────────────────────────────────────────────────────────────
+  Mise à jour 2026-06-10 — Correctif de l'affichage des produits d'administration (B13)
+
+  - Ajout de la méthode `paginateAdminList` manquante dans `ProductRepository.php` pour corriger l'erreur 500 lors de la récupération des produits.

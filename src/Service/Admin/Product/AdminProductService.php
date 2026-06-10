@@ -104,7 +104,7 @@ final class AdminProductService
 
     public function delete(Product $product, bool $flush = true): void
     {
-        if ($this->itemsRepository->countByProductId((int) $product->getId()) > 0) {
+        if ($this->itemsRepository->count(['product' => $product]) > 0) {
             throw new ProductDeletionNotAllowedException('Impossible de supprimer un produit déjà présent dans des commandes.');
         }
 

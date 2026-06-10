@@ -39,6 +39,11 @@ readonly class AdminTwoFactorSuccessHandler implements AuthenticationSuccessHand
         if (!in_array('ROLE_ADMIN', $user->getRoles(), true)) {
             return new JsonResponse([
                 'token' => $this->jwtManager->create($user),
+                'user' => [
+                    'id' => $user->getId(),
+                    'email' => $user->getEmail(),
+                    'roles' => $user->getRoles(),
+                ]
             ]);
         }
 
