@@ -15,6 +15,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/products')]
 class ProductController extends AbstractController
@@ -39,6 +40,7 @@ class ProductController extends AbstractController
     }
 
     #[Route('', name: 'api_product_create', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function create(Request $request, EntityManagerInterface $em, CategoryRepository $catRepo): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -56,6 +58,7 @@ class ProductController extends AbstractController
     }
 
     #[Route('/{id}', name: 'api_product_update', methods: ['PUT', 'PATCH'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function update(Product $product, Request $request, EntityManagerInterface $em, CategoryRepository $catRepo): JsonResponse
     {
         $data = json_decode($request->getContent(), true);

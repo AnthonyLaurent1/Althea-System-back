@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Repository\UserRepository;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Psr\Cache\CacheItemPoolInterface;
+use Psr\Cache\InvalidArgumentException;
 
 final class AdminTwoFactorService
 {
@@ -22,6 +23,7 @@ final class AdminTwoFactorService
      * Vérifie le code OTP associé à un challenge et renvoie le JWT admin.
      *
      * @return array{token: string}
+     * @throws InvalidArgumentException
      */
     public function verify(string $challengeId, string $code): array
     {
