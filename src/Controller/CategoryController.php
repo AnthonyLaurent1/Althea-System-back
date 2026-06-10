@@ -16,7 +16,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/categories')]
 class CategoryController extends AbstractController
@@ -26,7 +25,7 @@ class CategoryController extends AbstractController
     {
         $locale = $request->query->get('locale', 'fr');
 
-        $categories = $repository->findBy([], ['displayOrder' => 'ASC', 'id' => 'ASC']);
+        $categories = $repository->findAll();
         $data = array_map(fn(Category $c) => $this->transformCategoryToDto($c, $locale), $categories);
 
         return $this->json($data);
@@ -58,6 +57,7 @@ class CategoryController extends AbstractController
         return $this->json($this->transformCategoryToDto($category), Response::HTTP_CREATED);
     }
 
+    #[Route('/{id}', name: 'api_category_update', methods: ['PUT', 'PATCH'])]
     #[Route('/reorder', name: 'api_category_reorder', methods: ['PATCH'])]
     #[IsGranted('ROLE_ADMIN')]
     public function reorder(Request $request, EntityManagerInterface $em, CategoryRepository $repository): JsonResponse

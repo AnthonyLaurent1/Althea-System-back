@@ -16,9 +16,12 @@ use Stripe\Exception\ApiErrorException;
 use Stripe\Webhook;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Stripe\Checkout\Session;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 #[Route('/api/order')]
 class OrderController extends AbstractController
@@ -310,7 +313,7 @@ class OrderController extends AbstractController
      */
     #[Route('/checkout', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    public function checkout(EntityManagerInterface $em, StripeService $stripeService): JsonResponse
+    public function checkout(Request $request, EntityManagerInterface $em, StripeService $stripeService): JsonResponse
     {
         $user = $this->getRealUser();
 
@@ -346,7 +349,7 @@ class OrderController extends AbstractController
         $totals = $this->calculateTotal($order);
         $order->setTotalPrice($totals['total']);
 
-        return $this->createStripeSession($order, $stripeService);
+        return $this->createStripeSession($order, $stripeService, $request);
     }
     private function getRealUser(): ?User
     {
@@ -358,7 +361,7 @@ class OrderController extends AbstractController
     /**
      * @throws ApiErrorException
      */
-    private function createStripeSession(Orders $order, StripeService $stripeService): JsonResponse
+    private function createStripeSession(Orders $order, StripeService $stripeService, Request $request): JsonResponse
     {
         $items = [];
 
@@ -370,10 +373,33 @@ class OrderController extends AbstractController
             ];
         }
 
+        $referer = $request->headers->get('referer');
+        $frontendUrl = 'http://localhost:3000'; // fallback
+        if ($referer) {
+            $parsed = parse_url($referer);
+            if (isset($parsed['scheme']) && isset($parsed['host'])) {
+                $frontendUrl = $parsed['scheme'] . '://' . $parsed['host'];
+                if (isset($parsed['port'])) {
+                    $frontendUrl .= ':' . $parsed['port'];
+                }
+            }
+        }
+
+        // Generate success URL dynamically matching current backend host/port
+        $successUrl = $this->generateUrl(
+            'order_success',
+            [
+                'session_id' => '{CHECKOUT_SESSION_ID}',
+                'order_id' => $order->getId(),
+                'frontend_url' => $frontendUrl
+            ],
+            UrlGeneratorInterface::ABSOLUTE_URL
+        );
+
         $session = $stripeService->createCheckoutSession(
             $items,
-            'http://localhost:8000/api/order/success?session_id={CHECKOUT_SESSION_ID}',
-            'http://localhost:3000/cancel',
+            $successUrl,
+            $frontendUrl . '/cancel',
             $order->getId()
         );
 
@@ -443,14 +469,99 @@ class OrderController extends AbstractController
         return new JsonResponse(['ok' => true]);
     }
 
-    #[Route('/success', methods: ['GET'])]
-    public function success(Request $request): JsonResponse
+    #[Route('/history', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    public function getOrderHistory(OrdersRepository $ordersRepository): JsonResponse
+    {
+        $user = $this->getRealUser();
+
+        if (!$user) {
+            return $this->json(['error' => 'Utilisateur invalide'], 401);
+        }
+
+        $orders = $ordersRepository->createQueryBuilder('o')
+            ->where('o.user = :user')
+            ->andWhere('o.status != :cartStatus')
+            ->setParameter('user', $user)
+            ->setParameter('cartStatus', 'cart')
+            ->orderBy('o.paymentDate', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        $data = [];
+        foreach ($orders as $order) {
+            $items = [];
+            foreach ($order->getItems() as $item) {
+                $items[] = [
+                    'id' => $item->getId(),
+                    'productId' => $item->getProduct()->getId(),
+                    'title' => $item->getProduct()->getTitle(),
+                    'quantity' => $item->getQuantity(),
+                    'price' => $item->getPrice(),
+                ];
+            }
+
+            $data[] = [
+                'id' => $order->getId(),
+                'status' => $order->getStatus(),
+                'totalPrice' => $order->getTotalPrice(),
+                'paymentDate' => $order->getPaymentDate() ? $order->getPaymentDate()->format('c') : null,
+                'items' => $items
+            ];
+        }
+
+        return $this->json($data);
+    }
+
+    #[Route('/success', name: 'order_success', methods: ['GET'])]
+    public function success(Request $request, EntityManagerInterface $em, StripeService $stripeService): RedirectResponse
     {
         $sessionId = $request->query->get('session_id');
+        $orderId = $request->query->get('order_id');
+        $frontendUrl = $request->query->get('frontend_url');
 
-        return $this->json([
-            'message' => 'Paiement réussi',
-            'session_id' => $sessionId
-        ]);
+        if (!$frontendUrl || !preg_match('/^https?:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?$/', $frontendUrl)) {
+            $frontendUrl = 'http://localhost:5173';
+        }
+
+        if ($sessionId) {
+            try {
+                $session = Session::retrieve($sessionId);
+                $metadataOrderId = $session->metadata->orderId ?? null;
+
+                if ($metadataOrderId && $session->payment_status === 'paid') {
+                    $order = $em->getRepository(Orders::class)->find($metadataOrderId);
+                    if ($order && $order->getStatus() !== 'Payé') {
+                        $this->markOrderAsPaid($order, $em);
+                    }
+                }
+            } catch (\Exception $e) {
+                // Fallback for dev environment: if Stripe retrieval fails (e.g. SSL error or mock session ID),
+                // we can mark the order as paid using the order_id query parameter.
+                $appEnv = $_ENV['APP_ENV'] ?? 'dev';
+                if ($appEnv === 'dev' && $orderId) {
+                    $order = $em->getRepository(Orders::class)->find($orderId);
+                    if ($order && $order->getStatus() !== 'Payé') {
+                        $this->markOrderAsPaid($order, $em);
+                    }
+                }
+            }
+        }
+
+        return $this->redirect($frontendUrl . '/account/orders');
+    }
+
+    private function markOrderAsPaid(Orders $order, EntityManagerInterface $em): void
+    {
+        foreach ($order->getItems() as $item) {
+            $product = $item->getProduct();
+            $newStock = $product->getInStock() - $item->getQuantity();
+            if ($newStock >= 0) {
+                $product->setInStock($newStock);
+            }
+        }
+        $order->setStatus('Payé');
+        $order->setPaymentDate(new \DateTime());
+        $em->flush();
     }
 }

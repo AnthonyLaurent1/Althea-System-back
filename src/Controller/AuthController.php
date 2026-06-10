@@ -113,6 +113,12 @@ class AuthController extends AbstractController
         return new JsonResponse(['message' => 'Email de réinitialisation envoyé si le compte existe'], 200);
     }
 
+    #[Route('/reset-password/{token}', name: 'api_reset_password_get', methods: ['GET'])]
+    public function resetPasswordGet(string $token): \Symfony\Component\HttpFoundation\Response
+    {
+        return $this->redirect('http://localhost:5173/reset-password?token=' . $token);
+    }
+
     #[Route('/reset-password/{token}', name: 'api_reset_password', methods: ['POST'])]
     public function resetPassword(string $token, Request $request, UserRepository $userRepo, UserPasswordHasherInterface $passwordHasher): JsonResponse
     {
@@ -133,6 +139,74 @@ class AuthController extends AbstractController
         $this->em->flush();
 
         return new JsonResponse(['message' => 'Mot de passe réinitialisé avec succès'], 200);
+    }
+
+    #[Route('/me', name: 'api_me', methods: ['GET'])]
+    public function me(): JsonResponse
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return new JsonResponse(['error' => 'Non authentifié'], 401);
+        }
+
+        return new JsonResponse([
+            'id' => $user->getId(),
+            'email' => $user->getEmail(),
+            'firstName' => $user->getFirstName(),
+            'lastName' => $user->getLastName(),
+            'phone' => $user->getPhone(),
+            'city' => $user->getCity(),
+            'country' => $user->getCountry(),
+            'address' => $user->getAddress(),
+            'additionalAddress' => $user->getAdditionalAddress(),
+            'postalCode' => $user->getPostalCode(),
+            'company' => $user->getCompany(),
+            'siret' => $user->getSiret(),
+            'isVerified' => $user->isVerified()
+        ]);
+    }
+
+    #[Route('/me', name: 'api_me_update', methods: ['PUT'])]
+    public function updateMe(Request $request): JsonResponse
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return new JsonResponse(['error' => 'Non authentifié'], 401);
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (isset($data['firstName'])) $user->setFirstName($data['firstName']);
+        if (isset($data['lastName'])) $user->setLastName($data['lastName']);
+        if (isset($data['phone'])) $user->setPhone($data['phone']);
+        if (isset($data['city'])) $user->setCity($data['city']);
+        if (isset($data['country'])) $user->setCountry($data['country']);
+        if (isset($data['address'])) $user->setAddress($data['address']);
+        if (isset($data['additionalAddress'])) $user->setAdditionalAddress($data['additionalAddress']);
+        if (isset($data['postalCode'])) $user->setPostalCode($data['postalCode']);
+        if (isset($data['company'])) $user->setCompany($data['company']);
+        if (isset($data['siret'])) $user->setSiret($data['siret']);
+
+        $this->em->flush();
+
+        return new JsonResponse([
+            'message' => 'Profil mis à jour avec succès',
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'firstName' => $user->getFirstName(),
+                'lastName' => $user->getLastName(),
+                'phone' => $user->getPhone(),
+                'city' => $user->getCity(),
+                'country' => $user->getCountry(),
+                'address' => $user->getAddress(),
+                'additionalAddress' => $user->getAdditionalAddress(),
+                'postalCode' => $user->getPostalCode(),
+                'company' => $user->getCompany(),
+                'siret' => $user->getSiret(),
+                'isVerified' => $user->isVerified()
+            ]
+        ]);
     }
 
     #[Route('/logout', name: 'api_logout', methods: ['POST'])]
