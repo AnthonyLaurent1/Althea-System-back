@@ -5,15 +5,16 @@ namespace App\Service;
 use App\Entity\ContactRequest;
 use App\Repository\ContactRequestRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 
 final class ContactService
 {
-    private const STATUS_NEW = 'new';
-    private const STATUS_READ = 'read';
-    private const STATUS_REPLIED = 'replied';
-    private const ALLOWED_STATUSES = [self::STATUS_NEW, self::STATUS_READ, self::STATUS_REPLIED];
+    private const string STATUS_NEW = 'new';
+    private const string STATUS_READ = 'read';
+    private const string STATUS_REPLIED = 'replied';
+    private const array ALLOWED_STATUSES = [self::STATUS_NEW, self::STATUS_READ, self::STATUS_REPLIED];
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -116,6 +117,7 @@ final class ContactService
 
     /**
      * @return array<string, mixed>
+     * @throws TransportExceptionInterface
      */
     public function reply(ContactRequest $contact, string $reply): array
     {
@@ -129,7 +131,7 @@ final class ContactService
         $contact->setStatus(self::STATUS_REPLIED);
         $this->entityManager->flush();
 
-        $email = (new Email())
+        $email = new Email()
             ->from('AltheaSystem@admin.com')
             ->to((string) $contact->getEmail())
             ->subject('Re: '.(string) $contact->getSubject())

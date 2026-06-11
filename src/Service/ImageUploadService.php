@@ -9,10 +9,9 @@ use Symfony\Component\Uid\Uuid;
 
 final class ImageUploadService
 {
-    private const MAX_SIZE = 5 * 1024 * 1024;
+    private const int|float MAX_SIZE = 5 * 1024 * 1024;
 
-    /** @var array<string, string> */
-    private const ALLOWED_MIME = [
+    private const array ALLOWED_MIME = [
         'image/jpeg' => 'jpg',
         'image/png' => 'png',
         'image/webp' => 'webp',
