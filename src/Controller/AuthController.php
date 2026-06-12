@@ -76,7 +76,13 @@ class AuthController extends AbstractController
         ], 201);
     }
 
-    #[Route('/verify-email/{token}', name: 'api_verify_email', methods: ['GET'])]
+    #[Route('/verify-email/{token}', name: 'api_verify_email_redirect', methods: ['GET'])]
+    public function verifyEmailRedirect(string $token): \Symfony\Component\HttpFoundation\Response
+    {
+        return $this->redirect('http://localhost:5173/verify-email?token=' . $token);
+    }
+
+    #[Route('/verify-email/{token}', name: 'api_verify_email', methods: ['POST'])]
     public function verifyEmail(string $token, EntityManagerInterface $em, JWTTokenManagerInterface $jwtManager): JsonResponse
     {
         $user = $em->getRepository(User::class)->findOneBy(['confirmationToken' => $token]);
